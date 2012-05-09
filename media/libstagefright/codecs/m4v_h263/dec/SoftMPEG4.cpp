@@ -60,6 +60,12 @@ SoftMPEG4::SoftMPEG4(
       mFramesConfigured(false),
       mNumSamplesOutput(0),
       mPvTime(0) {
+    if (mMode == MODE_H263) {
+        // H.263 requires the max size supported by the decoder
+        // which is 16CIF (1408x1152)
+        mWidth=1408;
+        mHeight=1152;
+    }
     initPorts(
             kNumInputBuffers,
             352 * 288 * 3 / 2 /* minInputBufferSize */,
