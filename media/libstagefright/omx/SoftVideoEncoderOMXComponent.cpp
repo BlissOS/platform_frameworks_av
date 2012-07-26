@@ -377,6 +377,33 @@ OMX_ERRORTYPE SoftVideoEncoderOMXComponent::internalGetParameter(
             return OMX_ErrorNone;
         }
 
+        case OMX_IndexParamPortDefinition:
+        {
+            OMX_PARAM_PORTDEFINITIONTYPE *def =
+                (OMX_PARAM_PORTDEFINITIONTYPE *)param;
+
+            if (def->nPortIndex > 1) {
+                return OMX_ErrorUndefined;
+            }
+
+            OMX_ERRORTYPE err = SimpleSoftOMXComponent::internalGetParameter(index, param);
+            if (OMX_ErrorNone != err) {
+                return err;
+            }
+
+            def->format.video.nFrameWidth = mWidth;
+            def->format.video.nFrameHeight = mHeight;
+
+            // XXX: For now just configure input and output buffers the same size.
+            // May want to determine a more suitable output buffer size independent
+            // of YUV format.
+            CHECK(mColorFormat == OMX_COLOR_FormatYUV420Planar ||
+                    mColorFormat == OMX_COLOR_FormatYUV420SemiPlanar);
+            def->nBufferSize = mWidth * mHeight * 3 / 2;
+
+            return OMX_ErrorNone;
+        }
+
         default:
             return SimpleSoftOMXComponent::internalGetParameter(index, param);
     }
