@@ -375,6 +375,7 @@ status_t StagefrightRecorder::setVideoFrameRate(int frames_per_second) {
 
     // Additional check on the frame rate will be performed later
     mFrameRate = frames_per_second;
+    mUserSetupFrameRate = true;
 
     return OK;
 }
@@ -1936,7 +1937,7 @@ status_t StagefrightRecorder::setupCameraSource(
 
     // When frame rate is not set, the actual frame rate will be set to
     // the current frame rate being used.
-    if (mFrameRate == -1) {
+    if (mFrameRate == -1 || !mUserSetupFrameRate) {
         int32_t frameRate = 0;
         CHECK ((*cameraSource)->getFormat()->findInt32(
                     kKeyFrameRate, &frameRate));
@@ -2489,6 +2490,7 @@ status_t StagefrightRecorder::reset() {
     mCameraSourceTimeLapse = NULL;
     mMetaDataStoredInVideoBuffers = kMetadataBufferTypeInvalid;
     mEncoderProfiles = MediaProfiles::getInstance();
+    mUserSetupFrameRate = false;
     mRotationDegrees = 0;
     mLatitudex10000 = -3600000;
     mLongitudex10000 = -3600000;
