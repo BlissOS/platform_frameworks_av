@@ -28,6 +28,8 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 
+#include <cutils/properties.h>
+
 namespace android {
 
 OMXMaster::OMXMaster() {
@@ -53,6 +55,7 @@ OMXMaster::OMXMaster() {
 
     addVendorPlugin();
     addPlatformPlugin();
+    addUserPlugin();
 }
 
 OMXMaster::~OMXMaster() {
@@ -65,6 +68,13 @@ void OMXMaster::addVendorPlugin() {
 
 void OMXMaster::addPlatformPlugin() {
     addPlugin("libstagefright_softomx_plugin.so");
+}
+
+void OMXMaster::addUserPlugin() {
+    char plugin[PROPERTY_VALUE_MAX];
+    if (property_get("media.sf.omx-plugin", plugin, NULL)) {
+        addPlugin(plugin);
+    }
 }
 
 void OMXMaster::addPlugin(const char *libname) {
