@@ -62,6 +62,7 @@ private:
 
     void addVendorPlugin();
     void addPlatformPlugin();
+    void addUserPlugin();
     void addPlugin(const char *libname);
     void addPlugin(OMXPluginBase *plugin);
     void clearPlugins();
