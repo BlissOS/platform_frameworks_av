@@ -348,9 +348,8 @@ status_t ColorConverter::convertYUV420PlanarUseLibYUV(
     switch (mDstFormat) {
     case OMX_COLOR_Format16bitRGB565:
     {
-        DECLARE_YUV2RGBFUNC(func, RGB565);
-        (*func)(src_y, src.mStride, src_u, src.mStride / 2, src_v, src.mStride / 2,
-                (uint8_t *)dst_ptr, dst.mStride, src.cropWidth(), src.cropHeight());
+        libyuv::I420ToRGB565Dither(src_y, src.mStride, src_u, src.mStride / 2, src_v, src.mStride / 2,
+                (uint8_t *)dst_ptr, dst.mStride, NULL, src.cropWidth(), src.cropHeight());
         break;
     }
 
