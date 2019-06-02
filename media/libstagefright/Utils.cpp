@@ -44,6 +44,8 @@
 #include <media/AudioParameter.h>
 #include <system/audio.h>
 
+#include <media/stagefright/FFMPEGSoftCodec.h>
+
 // TODO : Remove the defines once mainline media is built against NDK >= 31.
 // The mp4 extractor is part of mainline and builds against NDK 29 as of
 // writing. These keys are available only from NDK 31:
@@ -752,6 +754,8 @@ static std::vector<std::pair<const char *, uint32_t>> stringMappings {
         { "manufacturer", kKeyManufacturer },
         { "title", kKeyTitle },
         { "year", kKeyYear },
+        // FFMEG
+        { "file-format", kKeyFileFormat },
     }
 };
 
@@ -794,6 +798,21 @@ static std::vector<std::pair<const char *, uint32_t>> int32Mappings {
         { "thumbnail-height", kKeyThumbnailHeight },
         { "track-id", kKeyTrackID },
         { "valid-samples", kKeyValidSamples },
+        // FFMPEG
+        { "bits-per-raw-sample", kKeyBitsPerRawSample },
+        { "block-align", kKeyBlockAlign },
+        { "codec-id", kKeyCodecId },
+        { "coded-sample-bits", kKeyCodedSampleBits },
+        { "divx-version", kKeyDivXVersion },
+        { "min-block-size", 'mibs' },
+        { "max-block-size", 'mabs' },
+        { "min-frame-size", 'mifs' },
+        { "max-frame-size", 'mafs' },
+        { "rv-version", kKeyRVVersion },
+        { "sample-format", kKeySampleFormat },
+        { "sample-rate", kKeySampleRate },
+        { "wma-version", kKeyWMAVersion },
+        { "wmv-version", kKeyWMVVersion },
     }
 };
 
@@ -812,6 +831,8 @@ static std::vector<std::pair<const char *, uint32_t>> bufferMappings {
         { "thumbnail-csd-hevc", kKeyThumbnailHVCC },
         { "slow-motion-markers", kKeySlowMotionMarkers },
         { "thumbnail-csd-av1c", kKeyThumbnailAV1C },
+        // FFMEG
+        { "raw-codec-specific-data", kKeyRawCodecSpecificData },
     }
 };
 
@@ -1547,7 +1568,14 @@ status_t convertMetaDataToMessage(
         msg->setBuffer("csd-2", buffer);
     }
 
+    FFMPEGSoftCodec::convertMetaDataToMessageFF(meta, &msg);
     *format = msg;
+
+#if 0
+    ALOGI("convertMetaDataToMessage from:");
+    meta->dumpToLog();
+    ALOGI("  to: %s", msg->debugString(0).c_str());
+#endif
 
     return OK;
 }
@@ -2248,8 +2276,10 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
     }
     // XXX TODO add whatever other keys there are
 
+    FFMPEGSoftCodec::convertMessageToMetaDataFF(msg, meta);
+
 #if 0
-    ALOGI("converted %s to:", msg->debugString(0).c_str());
+    ALOGI("convertMessageToMetaData from %s to:", msg->debugString(0).c_str());
     meta->dumpToLog();
 #endif
     return OK;

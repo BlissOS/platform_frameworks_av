@@ -313,6 +313,12 @@ void MediaExtractorFactory::LoadExtractors() {
 #endif
             "/extractors", NULL, *newList);
 
+    RegisterExtractors("/vendor/lib"
+#ifdef __LP64__
+            "64"
+#endif
+            "/extractors", NULL, *newList);
+
     newList->sort(compareFunc);
     gPlugins = newList;
 
