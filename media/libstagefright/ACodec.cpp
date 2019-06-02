@@ -42,11 +42,14 @@
 #include <media/stagefright/BufferProducerWrapper.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecConstants.h>
+#include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/OMXClient.h>
 #include <media/stagefright/PersistentSurface.h>
 #include <media/stagefright/RenderedFrameInfo.h>
 #include <media/stagefright/SurfaceUtils.h>
+#include <media/stagefright/FFMPEGSoftCodec.h>
+
 #include <media/hardware/HardwareAPI.h>
 #include <media/MediaBufferHolder.h>
 #include <media/OMXBuffer.h>
@@ -636,6 +639,15 @@ ACodec::ACodec()
 }
 
 ACodec::~ACodec() {
+}
+
+status_t ACodec::setupCustomCodec(status_t err, const char *mime, const sp<AMessage> &msg) {
+     if (!strncmp(mComponentName.c_str(), "OMX.ffmpeg.", 11) && !mIsEncoder) {
+         return FFMPEGSoftCodec::setAudioFormat(
+               msg, mime, mOMX, mOMXNode);
+     }
+
+    return err;
 }
 
 void ACodec::initiateSetup(const sp<AMessage> &msg) {
@@ -2152,7 +2164,7 @@ status_t ACodec::configureCodec(
                 requiresSwRenderer = true;
             }
 
-            if (mComponentName.startsWith("OMX.google.") || requiresSwRenderer) {
+            if (mComponentName.startsWith("OMX.google.") || mComponentName.startsWith("OMX.ffmpeg.") || requiresSwRenderer) {
                 usingSwRenderer = true;
                 haveNativeWindow = false;
                 (void)setPortMode(kPortIndexOutput, IOMX::kPortModePresetByteBuffer);
@@ -2235,7 +2247,7 @@ status_t ACodec::configureCodec(
             err = setupRawAudioFormat(
                     encoder ? kPortIndexInput : kPortIndexOutput,
                     sampleRate,
-                    numChannels);
+                    numChannels, pcmEncoding);
         }
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC)) {
         int32_t numChannels, sampleRate;
@@ -2370,14 +2382,15 @@ status_t ACodec::configureCodec(
         } else {
             err = setupRawAudioFormat(kPortIndexInput, sampleRate, numChannels, pcmEncoding);
         }
-    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AC3)) {
+    } else if (!strncmp(mComponentName.c_str(), "OMX.google.", 11)
+            && !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AC3)) {
         int32_t numChannels;
         int32_t sampleRate;
         if (!msg->findInt32("channel-count", &numChannels)
                 || !msg->findInt32("sample-rate", &sampleRate)) {
             err = INVALID_OPERATION;
         } else {
-            err = setupAC3Codec(encoder, numChannels, sampleRate);
+            err = setupAC3Codec(encoder, numChannels, sampleRate, pcmEncoding);
         }
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_EAC3)) {
         int32_t numChannels;
@@ -2386,7 +2399,7 @@ status_t ACodec::configureCodec(
                 || !msg->findInt32("sample-rate", &sampleRate)) {
             err = INVALID_OPERATION;
         } else {
-            err = setupEAC3Codec(encoder, numChannels, sampleRate);
+            err = setupEAC3Codec(encoder, numChannels, sampleRate, pcmEncoding);
         }
      } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AC4)) {
         int32_t numChannels;
@@ -2397,6 +2410,8 @@ status_t ACodec::configureCodec(
         } else {
             err = setupAC4Codec(encoder, numChannels, sampleRate);
         }
+    } else {
+        err = setupCustomCodec(err, mime, msg);
     }
 
     if (err != OK) {
@@ -3080,9 +3095,9 @@ status_t ACodec::setupAACCodec(
 }
 
 status_t ACodec::setupAC3Codec(
-        bool encoder, int32_t numChannels, int32_t sampleRate) {
+        bool encoder, int32_t numChannels, int32_t sampleRate, AudioEncoding encoding) {
     status_t err = setupRawAudioFormat(
-            encoder ? kPortIndexInput : kPortIndexOutput, sampleRate, numChannels);
+            encoder ? kPortIndexInput : kPortIndexOutput, sampleRate, numChannels, encoding);
 
     if (err != OK) {
         return err;
@@ -3112,9 +3127,9 @@ status_t ACodec::setupAC3Codec(
 }
 
 status_t ACodec::setupEAC3Codec(
-        bool encoder, int32_t numChannels, int32_t sampleRate) {
+        bool encoder, int32_t numChannels, int32_t sampleRate, AudioEncoding encoding) {
     status_t err = setupRawAudioFormat(
-            encoder ? kPortIndexInput : kPortIndexOutput, sampleRate, numChannels);
+            encoder ? kPortIndexInput : kPortIndexOutput, sampleRate, numChannels, encoding);
 
     if (err != OK) {
         return err;
@@ -3625,6 +3640,9 @@ status_t ACodec::setupVideoDecoder(
     OMX_VIDEO_CODINGTYPE compressionFormat;
     status_t err = GetVideoCodingTypeFromMime(mime, &compressionFormat);
 
+    err = FFMPEGSoftCodec::setVideoFormat(err,
+                    msg, mime, mOMX, mOMXNode, mIsEncoder, &compressionFormat,
+                    mComponentName.c_str());
     if (err != OK) {
         return err;
     }
@@ -5396,6 +5414,14 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
 
                 default:
                 {
+                    if (!mIsEncoder && !strncmp(mComponentName.c_str(), "OMX.ffmpeg.", 11)) {
+                        err = FFMPEGSoftCodec::getVideoPortFormat(portIndex,
+                                (int)videoDef->eCompressionFormat, notify, mOMX, mOMXNode);
+                        if (err == OK) {
+                            break;
+                        }
+                    }
+
                     if (mIsEncoder ^ (portIndex == kPortIndexOutput)) {
                         // should be CodingUnused
                         ALOGE("Raw port video compression format is %s(%d)",
@@ -5557,6 +5583,13 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
 
                 case OMX_AUDIO_CodingFLAC:
                 {
+                    if (!mIsEncoder && !strncmp(mComponentName.c_str(), "OMX.ffmpeg.", 11)) {
+                        err = FFMPEGSoftCodec::getAudioPortFormat(portIndex,
+                                (int)audioDef->eEncoding, notify, mOMX, mOMXNode);
+                        if (err != OK) {
+                            return err;
+                        }
+                    } else {
                     OMX_AUDIO_PARAM_FLACTYPE params;
                     InitOMXParams(&params);
                     params.nPortIndex = portIndex;
@@ -5570,6 +5603,7 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
                     notify->setString("mime", MEDIA_MIMETYPE_AUDIO_FLAC);
                     notify->setInt32("channel-count", params.nChannels);
                     notify->setInt32("sample-rate", params.nSampleRate);
+                    }
                     break;
                 }
 
@@ -5731,6 +5765,14 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
                 }
 
                 default:
+                    if (!mIsEncoder && !strncmp(mComponentName.c_str(), "OMX.ffmpeg.", 11)) {
+                        err = FFMPEGSoftCodec::getAudioPortFormat(portIndex,
+                                (int)audioDef->eEncoding, notify, mOMX, mOMXNode);
+                    }
+                    if (err == OK) {
+                        break;
+                    }
+
                     ALOGE("Unsupported audio coding: %s(%d)\n",
                             asString(audioDef->eEncoding), audioDef->eEncoding);
                     return BAD_TYPE;
@@ -7272,8 +7314,79 @@ bool ACodec::LoadedState::onConfigureComponent(
         ALOGE("[%s] configureCodec returning error %d",
               mCodec->mComponentName.c_str(), err);
 
-        mCodec->signalError(OMX_ErrorUndefined, makeNoSideEffectStatus(err));
-        return false;
+        int32_t encoder;
+        if (!msg->findInt32("encoder", &encoder)) {
+            encoder = false;
+        }
+
+        if (!encoder && !strncmp(mime.c_str(), "video/", strlen("video/"))) {
+            Vector<AString> matchingCodecs;
+
+            MediaCodecList::findMatchingCodecs(
+                mime.c_str(),
+                encoder, // createEncoder
+                0,     // flags
+                &matchingCodecs);
+
+            err = mCodec->mOMXNode->freeNode();
+
+            if (err != OK) {
+                ALOGE("Failed to freeNode");
+                mCodec->signalError(OMX_ErrorUndefined, makeNoSideEffectStatus(err));
+                return false;
+            }
+
+            mCodec->mOMXNode.clear();
+
+            AString componentName;
+            sp<AMessage> notify = new AMessage(kWhatOMXMessageList, mCodec);
+            sp<CodecObserver> observer = new CodecObserver(notify);
+
+            err = NAME_NOT_FOUND;
+            for (size_t matchIndex = 0; matchIndex < matchingCodecs.size();
+                    ++matchIndex) {
+                componentName = matchingCodecs.itemAt(matchIndex);
+                if (!strcmp(mCodec->mComponentName.c_str(), componentName.c_str())) {
+                    continue;
+                }
+
+                pid_t tid = gettid();
+                int prevPriority = androidGetThreadPriority(tid);
+                androidSetThreadPriority(tid, ANDROID_PRIORITY_FOREGROUND);
+                err = mCodec->mOMX->allocateNode(componentName.c_str(), observer,
+                        &mCodec->mOMXNode);
+                androidSetThreadPriority(tid, prevPriority);
+
+                if (err == OK) {
+                    break;
+                } else {
+                    ALOGW("Allocating component '%s' failed, try next one.", componentName.c_str());
+                }
+
+                mCodec->mOMXNode.clear();
+            }
+
+            if (mCodec->mOMXNode.get() == NULL) {
+                if (!mime.empty()) {
+                    ALOGE("Unable to instantiate a %scoder for type '%s' with err %#x.",
+                            encoder ? "en" : "de", mime.c_str(), err);
+                } else {
+                    ALOGE("Unable to instantiate codec '%s' with err %#x.", componentName.c_str(), err);
+                }
+
+                mCodec->signalError((OMX_ERRORTYPE)err, makeNoSideEffectStatus(err));
+                return false;
+            }
+
+            mCodec->mComponentName = componentName;
+
+            err = mCodec->configureCodec(mime.c_str(), msg);
+        }
+
+        if (err != OK) {
+            mCodec->signalError((OMX_ERRORTYPE)err, makeNoSideEffectStatus(err));
+            return false;
+        }
     }
 
     mCodec->mCallback->onComponentConfigured(mCodec->mInputFormat, mCodec->mOutputFormat);
