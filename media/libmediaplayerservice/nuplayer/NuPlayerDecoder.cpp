@@ -41,6 +41,9 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/SurfaceUtils.h>
 #include <mpeg2ts/ATSParser.h>
+
+#include <media/stagefright/FFMPEGSoftCodec.h>
+
 #include <gui/Surface.h>
 
 namespace android {
@@ -300,8 +303,16 @@ void NuPlayer::Decoder::onConfigure(const sp<AMessage> &format) {
     mComponentName.append(" decoder");
     ALOGV("[%s] onConfigure (surface=%p)", mComponentName.c_str(), mSurface.get());
 
-    mCodec = MediaCodec::CreateByType(
-            mCodecLooper, mime.c_str(), false /* encoder */, NULL /* err */, mPid, mUid, format);
+    FFMPEGSoftCodec::overrideComponentName(0, format, &mComponentName, &mime, false);
+
+    if (!mComponentName.startsWith(mime.c_str())) {
+        mCodec = MediaCodec::CreateByComponentName(
+                mCodecLooper, mComponentName.c_str(), NULL, mPid, mUid);
+    } else {
+        mCodec = MediaCodec::CreateByType(
+                mCodecLooper, mime.c_str(), false /* encoder */, NULL /* err */, mPid, mUid, format);
+    }
+
     int32_t secure = 0;
     if (format->findInt32("secure", &secure) && secure != 0) {
         if (mCodec != NULL) {
