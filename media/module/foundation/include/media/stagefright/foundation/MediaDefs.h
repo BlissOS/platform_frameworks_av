@@ -18,6 +18,8 @@
 
 #define MEDIA_DEFS_H_
 
+#include <stdint.h>
+
 namespace android {
 
 extern const char *MEDIA_MIMETYPE_IMAGE_JPEG;
@@ -135,16 +137,87 @@ extern const char *MEDIA_MIMETYPE_TEXT_CEA_608;
 extern const char *MEDIA_MIMETYPE_TEXT_CEA_708;
 extern const char *MEDIA_MIMETYPE_DATA_TIMED_ID3;
 
+extern const char *MEDIA_MIMETYPE_AUDIO_EAC3_JOC;
+extern const char *MEDIA_MIMETYPE_AUDIO_EAC3;
+
+extern const char *MEDIA_MIMETYPE_VIDEO_DIVX;
+extern const char *MEDIA_MIMETYPE_VIDEO_DIVX311;
+extern const char *MEDIA_MIMETYPE_VIDEO_DIVX4;
+extern const char *MEDIA_MIMETYPE_VIDEO_FLV1;
+extern const char *MEDIA_MIMETYPE_VIDEO_MJPEG;
+extern const char *MEDIA_MIMETYPE_VIDEO_RV;
+extern const char *MEDIA_MIMETYPE_VIDEO_VC1;
+extern const char *MEDIA_MIMETYPE_VIDEO_WMV;
+extern const char *MEDIA_MIMETYPE_VIDEO_HEVC;
+extern const char *MEDIA_MIMETYPE_VIDEO_FFMPEG;
+
+extern const char *MEDIA_MIMETYPE_AUDIO_AC3;
+extern const char *MEDIA_MIMETYPE_AUDIO_ALAC;
+extern const char *MEDIA_MIMETYPE_AUDIO_APE;
+extern const char *MEDIA_MIMETYPE_AUDIO_PCM;
+extern const char *MEDIA_MIMETYPE_AUDIO_RA;
+extern const char *MEDIA_MIMETYPE_AUDIO_WMA;
+extern const char *MEDIA_MIMETYPE_AUDIO_FFMPEG;
+
+extern const char *MEDIA_MIMETYPE_CONTAINER_APE;
+extern const char *MEDIA_MIMETYPE_CONTAINER_ASF;
+extern const char *MEDIA_MIMETYPE_CONTAINER_DIVX;
+extern const char *MEDIA_MIMETYPE_CONTAINER_DTS;
+extern const char *MEDIA_MIMETYPE_CONTAINER_FLAC;
+extern const char *MEDIA_MIMETYPE_CONTAINER_FLV;
+extern const char *MEDIA_MIMETYPE_CONTAINER_MOV;
+extern const char *MEDIA_MIMETYPE_CONTAINER_MP2;
+extern const char *MEDIA_MIMETYPE_CONTAINER_MPG;
+extern const char *MEDIA_MIMETYPE_CONTAINER_RA;
+extern const char *MEDIA_MIMETYPE_CONTAINER_RM;
+extern const char *MEDIA_MIMETYPE_CONTAINER_TS;
+extern const char *MEDIA_MIMETYPE_CONTAINER_WEBM;
+extern const char *MEDIA_MIMETYPE_CONTAINER_VC1;
+extern const char *MEDIA_MIMETYPE_CONTAINER_HEVC;
+extern const char *MEDIA_MIMETYPE_CONTAINER_WMA;
+extern const char *MEDIA_MIMETYPE_CONTAINER_WMV;
+extern const char *MEDIA_MIMETYPE_CONTAINER_FFMPEG;
+
 // These are values exported to JAVA API that need to be in sync with
 // frameworks/base/media/java/android/media/AudioFormat.java. Unfortunately,
 // they are not defined in frameworks/av, so defining them here.
 enum AudioEncoding {
+    kAudioEncodingInvalid = 0,
     kAudioEncodingPcm16bit = 2,
     kAudioEncodingPcm8bit = 3,
     kAudioEncodingPcmFloat = 4,
     kAudioEncodingPcm24bitPacked = 21,
     kAudioEncodingPcm32bit = 22,
 };
+
+static inline AudioEncoding bitsToAudioEncoding(int32_t bits) {
+    switch (bits) {
+        case 8:
+            return kAudioEncodingPcm8bit;
+        case 16:
+            return kAudioEncodingPcm16bit;
+        case 32:
+            return kAudioEncodingPcmFloat;
+    }
+    return kAudioEncodingInvalid;
+}
+
+static inline int32_t audioEncodingToBits(AudioEncoding encoding) {
+    switch (encoding) {
+        case kAudioEncodingInvalid:
+            return 0;
+        case kAudioEncodingPcm8bit:
+            return 8;
+        case kAudioEncodingPcm16bit:
+            return 16;
+        case kAudioEncodingPcm24bitPacked:
+            return 24;
+        case kAudioEncodingPcm32bit:
+        case kAudioEncodingPcmFloat:
+            return 32;
+    }
+    return 0;
+}
 
 }  // namespace android
 
