@@ -42,7 +42,6 @@ cc_library {
             "signed-integer-overflow",
             "unsigned-integer-overflow",
         ],
-        cfi: true,
     },
 
     shared_libs: [

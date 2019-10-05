@@ -61,7 +61,6 @@ cc_defaults {
             "signed-integer-overflow",
             "unsigned-integer-overflow",
         ],
-        cfi: true,
     },
 }
 
