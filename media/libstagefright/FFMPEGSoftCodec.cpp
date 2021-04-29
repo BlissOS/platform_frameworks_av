@@ -28,6 +28,7 @@
 #include <media/stagefright/foundation/ABitReader.h>
 
 #include <media/stagefright/FFMPEGSoftCodec.h>
+#include <media/stagefright/FFMPEGUtil.h>
 #include <media/stagefright/omx/OMXUtils.h>
 
 #include <media/stagefright/ACodec.h>
@@ -52,143 +53,6 @@
 #endif
 
 namespace android {
-
-enum MetaKeyType{
-    INT32, INT64, STRING, DATA, CSD
-};
-
-struct MetaKeyEntry{
-    int MetaKey;
-    const char* MsgKey;
-    MetaKeyType KeyType;
-};
-
-static const MetaKeyEntry MetaKeyTable[] {
-   {kKeyAACAOT               , "aac-profile"            , INT32},
-   {kKeyArbitraryMode        , "use-arbitrary-mode"     , INT32},
-   {kKeyBitsPerRawSample     , "bits-per-raw-sample"    , INT32},
-   {kKeyBitRate              , "bitrate"                , INT32},
-   {kKeyBlockAlign           , "block-align"            , INT32},
-   {kKeyChannelCount         , "channel-count"          , INT32},
-   {kKeyCodecId              , "codec-id"               , INT32},
-   {kKeyCodedSampleBits      , "coded-sample-bits"      , INT32},
-   {kKeyFileFormat           , "file-format"            , INT32},
-   {kKeyRawCodecSpecificData , "raw-codec-specific-data", CSD},
-   {kKeyPcmEncoding          , "pcm-encoding"           , INT32},
-   {kKeyRVVersion            , "rv-version"             , INT32},
-   {kKeySampleFormat         , "sample-format"          , INT32},
-   {kKeySampleRate           , "sample-rate"            , INT32},
-   {kKeyWMAVersion           , "wma-version"            , INT32},  // int32_t
-   {kKeyWMVVersion           , "wmv-version"            , INT32},
-   {kKeyDivXVersion          , "divx-version"           , INT32},
-   {kKeyThumbnailTime        , "thumbnail-time"         , INT64},
-};
-
-const char* FFMPEGSoftCodec::getMsgKey(int key) {
-    static const size_t numMetaKeys =
-                     sizeof(MetaKeyTable) / sizeof(MetaKeyTable[0]);
-    size_t i;
-    for (i = 0; i < numMetaKeys; ++i) {
-        if (key == MetaKeyTable[i].MetaKey) {
-            return MetaKeyTable[i].MsgKey;
-        }
-    }
-    return "unknown";
-}
-
-void FFMPEGSoftCodec::convertMetaDataToMessageFF(
-        const MetaDataBase *meta, sp<AMessage> *format) {
-    const char * str_val;
-    int32_t int32_val;
-    int64_t int64_val;
-    uint32_t data_type;
-    const void * data;
-    size_t size;
-    static const size_t numMetaKeys =
-                     sizeof(MetaKeyTable) / sizeof(MetaKeyTable[0]);
-    size_t i;
-    for (i = 0; i < numMetaKeys; ++i) {
-        if (MetaKeyTable[i].KeyType == INT32 &&
-            meta->findInt32(MetaKeyTable[i].MetaKey, &int32_val)) {
-            ALOGV("found metakey %s of type int32", MetaKeyTable[i].MsgKey);
-            format->get()->setInt32(MetaKeyTable[i].MsgKey, int32_val);
-        } else if (MetaKeyTable[i].KeyType == INT64 &&
-                 meta->findInt64(MetaKeyTable[i].MetaKey, &int64_val)) {
-            ALOGV("found metakey %s of type int64", MetaKeyTable[i].MsgKey);
-            format->get()->setInt64(MetaKeyTable[i].MsgKey, int64_val);
-        } else if (MetaKeyTable[i].KeyType == STRING &&
-                 meta->findCString(MetaKeyTable[i].MetaKey, &str_val)) {
-            ALOGV("found metakey %s of type string", MetaKeyTable[i].MsgKey);
-            format->get()->setString(MetaKeyTable[i].MsgKey, str_val);
-        } else if ( (MetaKeyTable[i].KeyType == DATA ||
-                   MetaKeyTable[i].KeyType == CSD) &&
-                   meta->findData(MetaKeyTable[i].MetaKey, &data_type, &data, &size)) {
-            ALOGV("found metakey %s of type data", MetaKeyTable[i].MsgKey);
-            if (MetaKeyTable[i].KeyType == CSD) {
-                const char *mime;
-                CHECK(meta->findCString(kKeyMIMEType, &mime));
-                if (strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)) {
-                    sp<ABuffer> buffer = new ABuffer(size);
-                    memcpy(buffer->data(), data, size);
-                    buffer->meta()->setInt32("csd", true);
-                    buffer->meta()->setInt64("timeUs", 0);
-                    format->get()->setBuffer("csd-0", buffer);
-                } else {
-                    const uint8_t *ptr = (const uint8_t *)data;
-                    CHECK(size >= 8);
-                    int seqLength = 0, picLength = 0;
-                    for (size_t i = 4; i < (size - 4); i++)
-                    {
-                        if ((*(ptr + i) == 0) && (*(ptr + i + 1) == 0) &&
-                           (*(ptr + i + 2) == 0) && (*(ptr + i + 3) == 1))
-                            seqLength = i;
-                    }
-                    sp<ABuffer> buffer = new ABuffer(seqLength);
-                    memcpy(buffer->data(), data, seqLength);
-                    buffer->meta()->setInt32("csd", true);
-                    buffer->meta()->setInt64("timeUs", 0);
-                    format->get()->setBuffer("csd-0", buffer);
-                    picLength=size-seqLength;
-                    sp<ABuffer> buffer1 = new ABuffer(picLength);
-                    memcpy(buffer1->data(), (const uint8_t *)data + seqLength, picLength);
-                    buffer1->meta()->setInt32("csd", true);
-                    buffer1->meta()->setInt64("timeUs", 0);
-                    format->get()->setBuffer("csd-1", buffer1);
-                }
-            } else {
-                sp<ABuffer> buffer = new ABuffer(size);
-                memcpy(buffer->data(), data, size);
-                format->get()->setBuffer(MetaKeyTable[i].MsgKey, buffer);
-            }
-        }
-    }
-}
-
-void FFMPEGSoftCodec::convertMessageToMetaDataFF(
-        const sp<AMessage> &msg, sp<MetaData> &meta) {
-    AString str_val;
-    int32_t int32_val;
-    int64_t int64_val;
-    static const size_t numMetaKeys =
-                     sizeof(MetaKeyTable) / sizeof(MetaKeyTable[0]);
-    size_t i;
-    for (i = 0; i < numMetaKeys; ++i) {
-        if (MetaKeyTable[i].KeyType == INT32 &&
-                msg->findInt32(MetaKeyTable[i].MsgKey, &int32_val)) {
-            ALOGV("found metakey %s of type int32", MetaKeyTable[i].MsgKey);
-            meta->setInt32(MetaKeyTable[i].MetaKey, int32_val);
-        } else if (MetaKeyTable[i].KeyType == INT64 &&
-                msg->findInt64(MetaKeyTable[i].MsgKey, &int64_val)) {
-            ALOGV("found metakey %s of type int64", MetaKeyTable[i].MsgKey);
-            meta->setInt64(MetaKeyTable[i].MetaKey, int64_val);
-        } else if (MetaKeyTable[i].KeyType == STRING &&
-                msg->findString(MetaKeyTable[i].MsgKey, &str_val)) {
-            ALOGV("found metakey %s of type string", MetaKeyTable[i].MsgKey);
-            meta->setCString(MetaKeyTable[i].MetaKey, str_val.c_str());
-        }
-    }
-}
-
 
 const char* FFMPEGSoftCodec::overrideComponentName(
         uint32_t /*quirks*/, const sp<MetaData> &meta, const char *mime, bool isEncoder) {
@@ -453,7 +317,7 @@ status_t FFMPEGSoftCodec::setQCDIVXFormat(
     InitOMXParams(&paramDivX);
     paramDivX.nPortIndex = port_index;
     int32_t DivxVersion = 0;
-    if (!msg->findInt32(getMsgKey(kKeyDivXVersion), &DivxVersion)) {
+    if (!msg->findInt32(FFMPEGUtil::getMsgKey(kKeyDivXVersion), &DivxVersion)) {
         // Cannot find the key, the caller is skipping the container
         // and use codec directly, let determine divx version from
         // mime type
@@ -779,7 +643,7 @@ status_t FFMPEGSoftCodec::setWMVFormat(
     int32_t version = -1;
     OMX_VIDEO_PARAM_WMVTYPE paramWMV;
 
-    if (!msg->findInt32(getMsgKey(kKeyWMVVersion), &version)) {
+    if (!msg->findInt32(FFMPEGUtil::getMsgKey(kKeyWMVVersion), &version)) {
         ALOGE("WMV version not detected");
     }
 
@@ -811,7 +675,7 @@ status_t FFMPEGSoftCodec::setRVFormat(
     int32_t version = kTypeRVVer_G2;
     OMX_VIDEO_PARAM_RVTYPE paramRV;
 
-    if (!msg->findInt32(getMsgKey(kKeyRVVersion), &version)) {
+    if (!msg->findInt32(FFMPEGUtil::getMsgKey(kKeyRVVersion), &version)) {
         ALOGE("RV version not detected");
     }
 
@@ -846,13 +710,13 @@ status_t FFMPEGSoftCodec::setFFmpegVideoFormat(
 
     ALOGD("setFFmpegVideoFormat");
 
-    if (msg->findInt32(getMsgKey(kKeyWidth), &width)) {
+    if (msg->findInt32(FFMPEGUtil::getMsgKey(kKeyWidth), &width)) {
         ALOGE("No video width specified");
     }
-    if (msg->findInt32(getMsgKey(kKeyHeight), &height)) {
+    if (msg->findInt32(FFMPEGUtil::getMsgKey(kKeyHeight), &height)) {
         ALOGE("No video height specified");
     }
-    if (!msg->findInt32(getMsgKey(kKeyCodecId), &codec_id)) {
+    if (!msg->findInt32(FFMPEGUtil::getMsgKey(kKeyCodecId), &codec_id)) {
         ALOGE("No codec id sent for FFMPEG catch-all codec!");
     }
 
@@ -881,9 +745,9 @@ status_t FFMPEGSoftCodec::setRawAudioFormat(
     int32_t sampleRate = 0;
     AudioEncoding encoding = kAudioEncodingPcm16bit;
 
-    CHECK(msg->findInt32(getMsgKey(kKeyChannelCount), &numChannels));
-    CHECK(msg->findInt32(getMsgKey(kKeySampleRate), &sampleRate));
-    if (!msg->findInt32(getMsgKey(kKeyPcmEncoding), (int32_t*)&encoding)) {
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeyChannelCount), &numChannels));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeySampleRate), &sampleRate));
+    if (!msg->findInt32(FFMPEGUtil::getMsgKey(kKeyPcmEncoding), (int32_t*)&encoding)) {
         ALOGD("No PCM format specified, using 16 bit");
     }
 
@@ -968,26 +832,26 @@ status_t FFMPEGSoftCodec::setWMAFormat(
 
     OMX_AUDIO_PARAM_WMATYPE paramWMA;
 
-    CHECK(msg->findInt32(getMsgKey(kKeyChannelCount), &numChannels));
-    CHECK(msg->findInt32(getMsgKey(kKeySampleRate), &sampleRate));
-    CHECK(msg->findInt32(getMsgKey(kKeyBitRate), &bitRate));
-    if (!msg->findInt32(getMsgKey(kKeyBlockAlign), &blockAlign)) {
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeyChannelCount), &numChannels));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeySampleRate), &sampleRate));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeyBitRate), &bitRate));
+    if (!msg->findInt32(FFMPEGUtil::getMsgKey(kKeyBlockAlign), &blockAlign)) {
         // we should be last on the codec list, but another sniffer may
         // have handled it and there is no hardware codec.
-        if (!msg->findInt32(getMsgKey(kKeyWMABlockAlign), &blockAlign)) {
+        if (!msg->findInt32(FFMPEGUtil::getMsgKey(kKeyWMABlockAlign), &blockAlign)) {
             return ERROR_UNSUPPORTED;
         }
     }
 
     // mm-parser may want a different bit depth
-    if (msg->findInt32(getMsgKey(kKeyWMABitspersample), &bitsPerSample)) {
-        msg->setInt32(getMsgKey(kKeyPcmEncoding), (int32_t)bitsToAudioEncoding(bitsPerSample));
+    if (msg->findInt32(FFMPEGUtil::getMsgKey(kKeyWMABitspersample), &bitsPerSample)) {
+        msg->setInt32(FFMPEGUtil::getMsgKey(kKeyPcmEncoding), (int32_t)bitsToAudioEncoding(bitsPerSample));
     }
 
     ALOGV("Channels: %d, SampleRate: %d, BitRate: %d, blockAlign: %d",
             numChannels, sampleRate, bitRate, blockAlign);
 
-    CHECK(msg->findInt32(getMsgKey(kKeyWMAVersion), &version));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeyWMAVersion), &version));
 
     status_t err = setRawAudioFormat(msg, OMXhandle, node);
     if (err != OK)
@@ -1026,8 +890,8 @@ status_t FFMPEGSoftCodec::setVORBISFormat(
     int32_t sampleRate = 0;
     OMX_AUDIO_PARAM_VORBISTYPE param;
 
-    CHECK(msg->findInt32(getMsgKey(kKeyChannelCount), &numChannels));
-    CHECK(msg->findInt32(getMsgKey(kKeySampleRate), &sampleRate));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeyChannelCount), &numChannels));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeySampleRate), &sampleRate));
 
     ALOGV("Channels: %d, SampleRate: %d",
             numChannels, sampleRate);
@@ -1060,10 +924,10 @@ status_t FFMPEGSoftCodec::setRAFormat(
     int32_t blockAlign = 0;
     OMX_AUDIO_PARAM_RATYPE paramRA;
 
-    CHECK(msg->findInt32(getMsgKey(kKeyChannelCount), &numChannels));
-    CHECK(msg->findInt32(getMsgKey(kKeySampleRate), &sampleRate));
-    msg->findInt32(getMsgKey(kKeyBitRate), &bitRate);
-    CHECK(msg->findInt32(getMsgKey(kKeyBlockAlign), &blockAlign));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeyChannelCount), &numChannels));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeySampleRate), &sampleRate));
+    msg->findInt32(FFMPEGUtil::getMsgKey(kKeyBitRate), &bitRate);
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeyBlockAlign), &blockAlign));
 
     ALOGV("Channels: %d, SampleRate: %d, BitRate: %d, blockAlign: %d",
             numChannels, sampleRate, bitRate, blockAlign);
@@ -1099,9 +963,9 @@ status_t FFMPEGSoftCodec::setFLACFormat(
     AudioEncoding encoding = kAudioEncodingPcm16bit;
     OMX_AUDIO_PARAM_FLACTYPE param;
 
-    CHECK(msg->findInt32(getMsgKey(kKeyChannelCount), &numChannels));
-    CHECK(msg->findInt32(getMsgKey(kKeySampleRate), &sampleRate));
-    msg->findInt32(getMsgKey(kKeyPcmEncoding), (int32_t*)&encoding);
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeyChannelCount), &numChannels));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeySampleRate), &sampleRate));
+    msg->findInt32(FFMPEGUtil::getMsgKey(kKeyPcmEncoding), (int32_t*)&encoding);
 
     ALOGV("Channels: %d, SampleRate: %d Encoding: %d",
             numChannels, sampleRate, encoding);
@@ -1133,8 +997,8 @@ status_t FFMPEGSoftCodec::setMP2Format(
     int32_t sampleRate = 0;
     OMX_AUDIO_PARAM_MP2TYPE param;
 
-    CHECK(msg->findInt32(getMsgKey(kKeyChannelCount), &numChannels));
-    CHECK(msg->findInt32(getMsgKey(kKeySampleRate), &sampleRate));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeyChannelCount), &numChannels));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeySampleRate), &sampleRate));
 
     ALOGV("Channels: %d, SampleRate: %d",
             numChannels, sampleRate);
@@ -1165,8 +1029,8 @@ status_t FFMPEGSoftCodec::setAC3Format(
     int32_t sampleRate = 0;
     OMX_AUDIO_PARAM_ANDROID_AC3TYPE param;
 
-    CHECK(msg->findInt32(getMsgKey(kKeyChannelCount), &numChannels));
-    CHECK(msg->findInt32(getMsgKey(kKeySampleRate), &sampleRate));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeyChannelCount), &numChannels));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeySampleRate), &sampleRate));
 
     ALOGV("Channels: %d, SampleRate: %d",
             numChannels, sampleRate);
@@ -1198,9 +1062,9 @@ status_t FFMPEGSoftCodec::setAPEFormat(
     AudioEncoding encoding = kAudioEncodingPcm16bit;
     OMX_AUDIO_PARAM_APETYPE param;
 
-    CHECK(msg->findInt32(getMsgKey(kKeyChannelCount), &numChannels));
-    CHECK(msg->findInt32(getMsgKey(kKeySampleRate), &sampleRate));
-    CHECK(msg->findInt32(getMsgKey(kKeyPcmEncoding), (int32_t*)&encoding));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeyChannelCount), &numChannels));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeySampleRate), &sampleRate));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeyPcmEncoding), (int32_t*)&encoding));
 
     ALOGV("Channels:%d, SampleRate:%d, Encoding:%d",
             numChannels, sampleRate, encoding);
@@ -1232,8 +1096,8 @@ status_t FFMPEGSoftCodec::setDTSFormat(
     int32_t sampleRate = 0;
     OMX_AUDIO_PARAM_DTSTYPE param;
 
-    CHECK(msg->findInt32(getMsgKey(kKeyChannelCount), &numChannels));
-    CHECK(msg->findInt32(getMsgKey(kKeySampleRate), &sampleRate));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeyChannelCount), &numChannels));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeySampleRate), &sampleRate));
 
     ALOGV("Channels: %d, SampleRate: %d",
             numChannels, sampleRate);
@@ -1272,14 +1136,14 @@ status_t FFMPEGSoftCodec::setFFmpegAudioFormat(
 
     ALOGD("setFFmpegAudioFormat");
 
-    CHECK(msg->findInt32(getMsgKey(kKeyCodecId), &codec_id));
-    CHECK(msg->findInt32(getMsgKey(kKeyChannelCount), &numChannels));
-    CHECK(msg->findInt32(getMsgKey(kKeySampleFormat), &sampleFormat));
-    msg->findInt32(getMsgKey(kKeyBitRate), &bitRate);
-    msg->findInt32(getMsgKey(kKeySampleRate), &sampleRate);
-    msg->findInt32(getMsgKey(kKeyBlockAlign), &blockAlign);
-    msg->findInt32(getMsgKey(kKeyCodedSampleBits), &codedSampleBits);
-    msg->findInt32(getMsgKey(kKeyPcmEncoding), (int32_t*)&encoding);
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeyCodecId), &codec_id));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeyChannelCount), &numChannels));
+    CHECK(msg->findInt32(FFMPEGUtil::getMsgKey(kKeySampleFormat), &sampleFormat));
+    msg->findInt32(FFMPEGUtil::getMsgKey(kKeyBitRate), &bitRate);
+    msg->findInt32(FFMPEGUtil::getMsgKey(kKeySampleRate), &sampleRate);
+    msg->findInt32(FFMPEGUtil::getMsgKey(kKeyBlockAlign), &blockAlign);
+    msg->findInt32(FFMPEGUtil::getMsgKey(kKeyCodedSampleBits), &codedSampleBits);
+    msg->findInt32(FFMPEGUtil::getMsgKey(kKeyPcmEncoding), (int32_t*)&encoding);
 
     status_t err = setRawAudioFormat(msg, OMXhandle, node);
     if (err != OK)
