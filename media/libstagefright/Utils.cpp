@@ -44,7 +44,7 @@
 #include <media/AudioParameter.h>
 #include <system/audio.h>
 
-#include <media/stagefright/FFMPEGSoftCodec.h>
+#include <media/stagefright/FFMPEGUtil.h>
 
 // TODO : Remove the defines once mainline media is built against NDK >= 31.
 // The mp4 extractor is part of mainline and builds against NDK 29 as of
@@ -1594,7 +1594,7 @@ status_t convertMetaDataToMessage(
         msg->setBuffer("csd-2", buffer);
     }
 
-    FFMPEGSoftCodec::convertMetaDataToMessageFF(meta, &msg);
+    FFMPEGUtil::convertMetaDataToMessageFF(meta, &msg);
     *format = msg;
 
 #if 0
@@ -2322,7 +2322,7 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
     }
     // XXX TODO add whatever other keys there are
 
-    FFMPEGSoftCodec::convertMessageToMetaDataFF(msg, meta);
+    FFMPEGUtil::convertMessageToMetaDataFF(msg, meta);
 
 #if 0
     ALOGI("convertMessageToMetaData from %s to:", msg->debugString(0).c_str());
