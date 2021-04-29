@@ -38,12 +38,6 @@ struct FFMPEGSoftCodec {
         kPortIndexOutput = 1
     };
 
-    static void convertMessageToMetaDataFF(
-            const sp<AMessage> &msg, sp<MetaData> &meta);
-
-    static void convertMetaDataToMessageFF(
-        const MetaDataBase *meta, sp<AMessage> *format);
-
     static const char* overrideComponentName(
             uint32_t quirks, const sp<MetaData> &meta,
             const char *mime, bool isEncoder);
@@ -73,8 +67,6 @@ struct FFMPEGSoftCodec {
             sp<AMessage> &notify, sp<IOMX> OMXhandle, sp<IOMXNode> node);
 
 private:
-    static const char* getMsgKey(int key);
-
     static status_t setWMVFormat(
             const sp<AMessage> &msg, sp<IOMX> OMXhandle,
             sp<IOMXNode> node);
