@@ -1309,7 +1309,7 @@ void ARTPConnection::checkRxBitrate(int64_t nowUs) {
         mLastBitrateReportTimeUs = nowUs;
     }
     else if (mLastEarlyNotifyTimeUs + kMinOneSecondNotifyDelayUs <= nowUs) {
-        int32_t timeDiff = (nowUs - mLastBitrateReportTimeUs) / 1000000ll;
+        int32_t timeDiff = (nowUs - mLastEarlyNotifyTimeUs) / kMinOneSecondNotifyDelayUs;
         int32_t bitrate = mCumulativeBytes * 8 / timeDiff;
         mLastEarlyNotifyTimeUs = nowUs;
 
