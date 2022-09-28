@@ -838,6 +838,7 @@ static std::vector<std::pair<const char *, uint32_t>> bufferMappings {
         { "slow-motion-markers", kKeySlowMotionMarkers },
         { "thumbnail-csd-av1c", kKeyThumbnailAV1C },
         // FFMEG
+        { "raw-codec-data", kKeyRawCodecData },
         { "raw-codec-specific-data", kKeyRawCodecSpecificData },
     }
 };
