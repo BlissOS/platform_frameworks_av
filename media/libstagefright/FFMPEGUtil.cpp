@@ -46,6 +46,7 @@ static const MetaKeyEntry MetaKeyTable[] {
    {kKeyCodecId              , "codec-id"               , INT32},
    {kKeyCodedSampleBits      , "coded-sample-bits"      , INT32},
    {kKeyFileFormat           , "file-format"            , INT32},
+   {kKeyRawCodecData         , "raw-codec-data"         , DATA},
    {kKeyRawCodecSpecificData , "raw-codec-specific-data", CSD},
    {kKeyPcmEncoding          , "pcm-encoding"           , INT32},
    {kKeyRVVersion            , "rv-version"             , INT32},
