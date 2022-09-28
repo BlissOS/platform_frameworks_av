@@ -29,6 +29,7 @@
 
 #include <media/stagefright/FFMPEGSoftCodec.h>
 #include <media/stagefright/FFMPEGUtil.h>
+#include <media/stagefright/FFMPEGOmxExtn.h>
 #include <media/stagefright/omx/OMXUtils.h>
 
 #include <media/stagefright/ACodec.h>
@@ -43,8 +44,6 @@
 #include <OMX_Component.h>
 #include <OMX_AudioExt.h>
 #include <OMX_IndexExt.h>
-
-#include <OMX_FFMPEG_Extn.h>
 
 #include <cutils/properties.h>
 
