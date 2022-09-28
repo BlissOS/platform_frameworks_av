@@ -186,11 +186,6 @@ cc_library_static {
         "-Wall",
     ],
 
-    include_dirs: [
-        // FFMPEG plugin
-        "external/stagefright-plugins/include"
-    ],
-
     sanitize: {
         cfi: true,
         misc_undefined: [
@@ -410,11 +405,6 @@ cc_library {
         "libstagefright_xmlparser_headers",
         "media_ndk_headers",
         "libmediaformatshaper_headers",
-    ],
-
-    include_dirs: [
-        // FFMPEG plugin
-        "external/stagefright-plugins/include"
     ],
 
     export_shared_lib_headers: [
