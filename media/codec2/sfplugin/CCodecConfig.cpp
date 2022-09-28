@@ -1034,6 +1034,11 @@ void CCodecConfig::initializeStandardParams() {
     KEY_AUDIO_SESSION_ID // we use "audio-hw-sync"
     KEY_OUTPUT_REORDER_DEPTH
     */
+
+    // FFMPEG
+
+    add(ConfigMapper("raw-codec-data", C2_PARAMKEY_RAW_CODEC_DATA, "value")
+        .limitTo(D::DECODER & D::CODED));
 }
 
 status_t CCodecConfig::initialize(
