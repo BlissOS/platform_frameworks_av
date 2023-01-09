@@ -134,9 +134,16 @@ void SoftwareRenderer::resetFormatIfChanged(
             case OMX_COLOR_FormatYUV420SemiPlanar:
             case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
             {
+                char property[PROPERTY_VALUE_MAX];
+                bool disableYUV = false;
+                if (property_get("ro.yuv420.disable", property, "false") > 0)
+                    if (strcmp(property, "true") == 0)
+                        disableYUV = true;
+                if (!disableYUV) {
                 halFormat = HAL_PIXEL_FORMAT_YV12;
                 bufWidth = (mCropWidth + 1) & ~1;
                 bufHeight = (mCropHeight + 1) & ~1;
+                }
                 break;
             }
             case OMX_COLOR_Format24bitRGB888:
