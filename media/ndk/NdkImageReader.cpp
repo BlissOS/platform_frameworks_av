@@ -476,6 +476,10 @@ AImageReader::acquireImageLocked(/*out*/AImage** image, /*out*/int* acquireFence
                 // YUV.
                 mHalFormat = bufferFmt;
                 ALOGD("%s: Overriding buffer format YUV_420_888 to 0x%x.", __FUNCTION__, bufferFmt);
+            } else if (readerFmt == HAL_PIXEL_FORMAT_YCbCr_420_888 && bufferFmt == HAL_PIXEL_FORMAT_RGB_565) {
+                //YUV format is not supported on virtio gpu, fall back to RGB565
+                mHalFormat = bufferFmt;
+                ALOGD("%s: Overriding buffer format YUV_420_888 to 0x%x.", __FUNCTION__, bufferFmt);
             } else {
                 // Return the buffer to the queue. No need to provide fence, as this buffer wasn't
                 // used anywhere yet.
