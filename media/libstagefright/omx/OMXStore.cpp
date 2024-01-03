@@ -29,7 +29,6 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 
-#include <sstream>
 
 #include <cutils/properties.h>
 
@@ -141,25 +140,8 @@ static int getFirstApiLevel() {
     return android::base::GetIntProperty("ro.product.first_api_level", __ANDROID_API_T__);
 }
 
-static bool isTV() {
-    static const bool kIsTv = []() {
-        std::string characteristics = android::base::GetProperty("ro.build.characteristics", "");
-        std::stringstream ss(characteristics);
-        for (std::string item; std::getline(ss, item, ','); ) {
-            if (item == "tv") {
-                return true;
-            }
-        }
-        return false;
-    }();
-    return kIsTv;
-}
-
 void OMXStore::addPlugin(OMXPluginBase *plugin) {
     Mutex::Autolock autoLock(mLock);
-
-    bool typeTV = isTV();
-    int firstApiLevel = getFirstApiLevel();
 
     OMX_U32 index = 0;
 
@@ -175,16 +157,13 @@ void OMXStore::addPlugin(OMXPluginBase *plugin) {
             bool skip = false;
             for (String8 role : roles) {
                 if (role.find("video_decoder") != -1 || role.find("video_encoder") != -1) {
-                    if (firstApiLevel >= __ANDROID_API_T__) {
-                        skip = true;
-                        break;
-                    } else if (!typeTV && firstApiLevel >= __ANDROID_API_S__) {
+                    if (getFirstApiLevel() >= __ANDROID_API_S__) {
                         skip = true;
                         break;
                     }
                 }
                 if (role.find("audio_decoder") != -1 || role.find("audio_encoder") != -1) {
-                    if (firstApiLevel >= __ANDROID_API_T__) {
+                    if (getFirstApiLevel() >= __ANDROID_API_T__) {
                         skip = true;
                         break;
                     }
