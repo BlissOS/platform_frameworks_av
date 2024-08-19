@@ -247,9 +247,11 @@ std::shared_ptr<MultiAccessUnitInterface> ComponentStore::tryCreateMultiAccessUn
                 // param reflectors. Currently filters work on video domain only,
                 // and the MultiAccessUnitHelper is only enabled on audio domain;
                 // thus we pass the component's param reflector, which is mParamReflectors[0].
+                std::shared_ptr<C2ReflectorHelper> multiAccessReflector(new C2ReflectorHelper());
                 multiAccessUnitIntf = std::make_shared<MultiAccessUnitInterface>(
                         c2interface,
                         mMultiAccessUnitReflector);
+                mParamReflectors.push_back(mMultiAccessUnitReflector);
             }
         }
     }
