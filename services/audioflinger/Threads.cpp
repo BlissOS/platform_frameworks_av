@@ -10607,6 +10607,7 @@ status_t MmapThread::start(const AudioClient& client,
         config.channel_mask = mChannelMask;
         config.format = mFormat;
         audio_port_handle_t deviceId = getFirstDeviceId(mDeviceIds);
+        audio_source_t source = AUDIO_SOURCE_DEFAULT;
         mutex().unlock();
         ret = AudioSystem::getInputForAttr(&localAttr, &io,
                                               RECORD_RIID_INVALID,
@@ -10615,9 +10616,11 @@ status_t MmapThread::start(const AudioClient& client,
                                               &config,
                                               AUDIO_INPUT_FLAG_MMAP_NOIRQ,
                                               &deviceId,
-                                              &portId);
+                                              &portId,
+                                              &source);
         mutex().lock();
         // localAttr is const for getInputForAttr.
+        localAttr.source = source;
     }
     // APM should not chose a different input or output stream for the same set of attributes
     // and audo configuration
