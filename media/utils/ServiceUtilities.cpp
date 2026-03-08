@@ -169,18 +169,15 @@ static int checkRecordingInternal(const AttributionSourceState &attributionSourc
             return PERMISSION_HARD_DENIED;
         }
 
-        auto permission = source == AUDIO_SOURCE_REMOTE_SUBMIX ?
-                sModifyAudioRouting : sAndroidPermissionRecordAudio;
-
         permission::PermissionChecker permissionChecker;
         int permitted;
         if (start) {
             permitted = permissionChecker.checkPermissionForStartDataDeliveryFromDatasource(
-                    permission, resolvedAttributionSource.value(), msg,
+                    sAndroidPermissionRecordAudio, resolvedAttributionSource.value(), msg,
                     attributedOpCode);
         } else {
             permitted = permissionChecker.checkPermissionForPreflightFromDatasource(
-                    permission, resolvedAttributionSource.value(), msg,
+                    sAndroidPermissionRecordAudio, resolvedAttributionSource.value(), msg,
                     attributedOpCode);
         }
 
